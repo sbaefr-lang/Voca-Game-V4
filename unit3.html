@@ -1812,26 +1812,13 @@ function ggPluck(freq, gainLevel, dur, type){
 }
 
 /* ---- 게임 진행 중 텐션 사운드 (똑딱거리는 시계 + 은은한 저음) ---- */
-let ggDroneOsc = null;
-let ggDroneGain = null;
 let ggTickTimer = null;
 function ggStartTensionAmbience(){
   ggEnsureAudio();
   if(!ggAudioCtx || ggAudioMuted) return;
   ggStopTensionAmbience();
-  const now = ggAudioCtx.currentTime;
 
-  // 아주 은은하게 깔리는 낮은 저음 (계속 유지됨)
-  ggDroneOsc = ggAudioCtx.createOscillator();
-  ggDroneGain = ggAudioCtx.createGain();
-  ggDroneOsc.type = 'sine';
-  ggDroneOsc.frequency.value = 110;
-  ggDroneGain.gain.setValueAtTime(0.0001, now);
-  ggDroneGain.gain.linearRampToValueAtTime(0.02, now + 1.2);
-  ggDroneOsc.connect(ggDroneGain).connect(ggAudioCtx.destination);
-  ggDroneOsc.start(now);
-
-  // 시계 초침처럼 똑딱거리는 소리 (1초에 한 번)
+  // 시계 초침처럼 똑딱거리는 소리만 (1초에 한 번)
   ggTickTimer = setInterval(() => {
     if(ggAudioMuted || !ggAudioCtx) return;
     const t = ggAudioCtx.currentTime;
@@ -1852,15 +1839,6 @@ function ggStartTensionAmbience(){
 }
 function ggStopTensionAmbience(){
   if(ggTickTimer){ clearInterval(ggTickTimer); ggTickTimer = null; }
-  if(ggDroneOsc){
-    try{
-      const now = ggAudioCtx.currentTime;
-      ggDroneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-      ggDroneOsc.stop(now + 0.4);
-    }catch(e){}
-    ggDroneOsc = null;
-    ggDroneGain = null;
-  }
 }
 
 /* ---- 음소거 버튼 ---- */
