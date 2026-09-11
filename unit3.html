@@ -1404,7 +1404,7 @@ function switchTab(tab){
 }
 
 /* ============ GROUP GAME (그룹 게임, PeerJS) ============ */
-const GG_QUESTIONS_PER_GAME = Math.min(15, QUIZ_DATA.length);
+const GG_QUESTIONS_PER_GAME = Math.min(12, QUIZ_DATA.length);
 let ggRole = null;          // 'teacher' | 'student'
 let ggPeer = null;
 let ggConns = {};           // 선생님용: nick -> DataConnection
@@ -1476,6 +1476,7 @@ function ggCreateRoomAsHost(attemptsLeft){
       new QRCode(box, { text: joinLink, width: 176, height: 176, colorDark:'#0b3d91', colorLight:'#ffffff' });
     }
     ggRefreshTeacherLobbyUI();
+    ggStartWaitMusic();
 
     peer.on('connection', (conn) => {
       conn.on('data', (msg) => ggHandleHostMessage(conn, msg));
@@ -1582,6 +1583,7 @@ function ggStartNewRound(){
     ggState.players[nick].finishedAt = null;
   });
   ggBroadcastState();
+  ggStopWaitMusic();
   ggEnterTeacherPlaying();
 }
 document.getElementById('ggBtnStartGame').addEventListener('click', () => { ggEnsureAudio(); ggStartNewRound(); });
@@ -1797,25 +1799,33 @@ function ggEnsureAudio(){
     try{ ggAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
   }
 }
-const GG_MELODY = [523.25,587.33,659.25,783.99,659.25,587.33,523.25,440.00];
+const GG_MELODY = [659.25,698.46,783.99,880.00,783.99,698.46,659.25,587.33]; // 휘파람 느낌의 원곡 선율
+const GG_GUITAR_BASS = [130.81,130.81,164.81,164.81,196.00,196.00,164.81,130.81]; // 기타 반주 느낌의 원곡 저음
 let ggMelodyIdx = 0;
+function ggPluck(freq, gainLevel, dur){
+  if(!ggAudioCtx) return;
+  const osc = ggAudioCtx.createOscillator();
+  const gain = ggAudioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(gainLevel, ggAudioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ggAudioCtx.currentTime + dur);
+  osc.connect(gain).connect(ggAudioCtx.destination);
+  osc.start();
+  osc.stop(ggAudioCtx.currentTime + dur);
+}
 function ggStartWaitMusic(){
   ggEnsureAudio();
   if(!ggAudioCtx || ggAudioMuted) return;
+  ggStopWaitMusic();
   ggMelodyIdx = 0;
   ggWaitMusicTimer = setInterval(() => {
     if(ggAudioMuted || !ggAudioCtx) return;
-    const freq = GG_MELODY[ggMelodyIdx % GG_MELODY.length];
+    const i = ggMelodyIdx % GG_MELODY.length;
+    ggPluck(GG_MELODY[i], 0.06, 0.42);       // 휘파람 선율(위쪽 음)
+    ggPluck(GG_GUITAR_BASS[i], 0.045, 0.24); // 기타 반주(아래쪽, 통통 튕기는 느낌)
     ggMelodyIdx++;
-    const osc = ggAudioCtx.createOscillator();
-    const gain = ggAudioCtx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    gain.gain.value = 0.05;
-    osc.connect(gain).connect(ggAudioCtx.destination);
-    osc.start();
-    osc.stop(ggAudioCtx.currentTime + 0.35);
-  }, 380);
+  }, 420);
 }
 function ggStopWaitMusic(){
   if(ggWaitMusicTimer){ clearInterval(ggWaitMusicTimer); ggWaitMusicTimer = null; }
