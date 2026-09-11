@@ -800,13 +800,6 @@
   }
   .gg-banner.correct{ background:var(--green-100); color:#14532d; border:2px solid var(--green-500); }
   .gg-banner.wrong{ background:var(--amber-100); color:#7c4a03; border:2px solid var(--amber-500); }
-  .gg-mute-btn{
-    position:fixed; right:16px; bottom:16px;
-    width:46px; height:46px; border-radius:50%;
-    background:var(--blue-700); color:white; border:none;
-    font-size:20px; cursor:pointer; box-shadow:var(--shadow); z-index:9999;
-  }
-  .gg-mute-btn:active{ transform:scale(0.94); }
 
 </style>
 </head>
@@ -982,12 +975,14 @@
         <div class="gg-player-list" id="ggPlayerList"></div>
         <div class="gg-empty-note" id="ggPlayerEmptyNote">아직 참여한 학생이 없어요.</div>
         <button class="action-btn" style="width:100%;" id="ggBtnStartGame" disabled>게임 시작</button>
+        <button class="action-btn secondary" style="width:100%; margin-top:10px;" id="ggMuteBtnLobby">🔊 소리 끄기</button>
       </div>
     </div>
 
     <!-- 선생님: 게임 진행 중 -->
     <div class="card-box hidden" id="gg-screen-teacher-playing">
       <div class="prompt">🔴 게임 진행 중</div>
+      <button class="action-btn secondary" style="width:100%; margin-bottom:12px;" id="ggMuteBtnPlaying">🔊 소리 끄기</button>
       <div class="gg-player-list" id="ggPlayingList"></div>
     </div>
 
@@ -1022,6 +1017,7 @@
     <div class="card-box hidden" id="gg-screen-student-quiz">
       <div class="qnum" id="ggQQnum"></div>
       <div class="prompt">사진에 어울리는 단어를 고르세요</div>
+      <button class="action-btn secondary" style="width:100%; margin-bottom:10px;" id="ggMuteBtnQuiz">🔊 소리 끄기</button>
       <div class="mc-image-wrap">
         <img id="ggQImg" src="" alt="quiz image">
       </div>
@@ -1039,8 +1035,6 @@
   </div>
 
 </div>
-
-<button class="gg-mute-btn hidden" id="ggMuteBtn" title="음악 켜기/끄기">🔊</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -1398,7 +1392,6 @@ function switchTab(tab){
   document.getElementById('worksheetMode').classList.toggle('hidden', tab!=='worksheet');
   document.getElementById('printMode').classList.toggle('hidden', tab!=='print');
   document.getElementById('groupMode').classList.toggle('hidden', tab!=='group');
-  document.getElementById('ggMuteBtn').classList.toggle('hidden', tab!=='group');
 
   document.getElementById('statusBar').classList.toggle('hidden', tab==='worksheet' || tab==='print' || tab==='group');
 
@@ -1871,13 +1864,22 @@ function ggStopTensionAmbience(){
 }
 
 /* ---- 음소거 버튼 ---- */
-document.getElementById('ggMuteBtn').addEventListener('click', () => {
+/* ---- 소리 켜기/끄기 버튼 (여러 화면에 있음, 상태는 공유) ---- */
+function ggUpdateMuteButtons(){
+  const label = ggAudioMuted ? '🔇 소리 켜기' : '🔊 소리 끄기';
+  ['ggMuteBtnLobby','ggMuteBtnPlaying','ggMuteBtnQuiz'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = label;
+  });
+}
+function ggToggleMute(){
   ggAudioMuted = !ggAudioMuted;
-  document.getElementById('ggMuteBtn').textContent = ggAudioMuted ? '🔇' : '🔊';
-  if(ggAudioMuted){
-    ggStopTensionAmbience();
-  }
-});
+  ggUpdateMuteButtons();
+  if(ggAudioMuted) ggStopTensionAmbience();
+}
+document.getElementById('ggMuteBtnLobby').addEventListener('click', ggToggleMute);
+document.getElementById('ggMuteBtnPlaying').addEventListener('click', ggToggleMute);
+document.getElementById('ggMuteBtnQuiz').addEventListener('click', ggToggleMute);
 
 /* ---- 승리 팡파레 (한 번만 재생) ---- */
 function ggPlayVictoryJingle(){
