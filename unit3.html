@@ -800,6 +800,13 @@
   }
   .gg-banner.correct{ background:var(--green-100); color:#14532d; border:2px solid var(--green-500); }
   .gg-banner.wrong{ background:var(--amber-100); color:#7c4a03; border:2px solid var(--amber-500); }
+  .gg-mute-btn{
+    position:fixed; right:16px; bottom:16px;
+    width:46px; height:46px; border-radius:50%;
+    background:var(--blue-700); color:white; border:none;
+    font-size:20px; cursor:pointer; box-shadow:var(--shadow); z-index:50;
+  }
+  .gg-mute-btn:active{ transform:scale(0.94); }
 
 </style>
 </head>
@@ -1027,6 +1034,8 @@
       <div id="ggFinishBannerStudent"></div>
       <div id="ggFinishRankStudent"></div>
     </div>
+
+    <button class="gg-mute-btn" id="ggMuteBtn" title="음악 켜기/끄기">🔊</button>
 
   </div>
 
@@ -1493,7 +1502,7 @@ function ggCreateRoomAsHost(attemptsLeft){
   });
 }
 
-document.getElementById('ggBtnCreateRoom').addEventListener('click', () => ggCreateRoomAsHost());
+document.getElementById('ggBtnCreateRoom').addEventListener('click', () => { ggEnsureAudio(); ggCreateRoomAsHost(); });
 
 document.getElementById('ggBtnCopyCode').addEventListener('click', () => {
   const code = document.getElementById('ggRoomCodeText').textContent;
@@ -1575,8 +1584,8 @@ function ggStartNewRound(){
   ggBroadcastState();
   ggEnterTeacherPlaying();
 }
-document.getElementById('ggBtnStartGame').addEventListener('click', ggStartNewRound);
-document.getElementById('ggBtnNewRound').addEventListener('click', ggStartNewRound);
+document.getElementById('ggBtnStartGame').addEventListener('click', () => { ggEnsureAudio(); ggStartNewRound(); });
+document.getElementById('ggBtnNewRound').addEventListener('click', () => { ggEnsureAudio(); ggStartNewRound(); });
 
 function ggSortedPlayers(state){
   return Object.entries(state.players || {}).sort((a,b) => {
@@ -1591,6 +1600,7 @@ function ggSortedPlayers(state){
 function ggEnterTeacherPlaying(){
   ggShow('gg-screen-teacher-playing');
   ggRenderTeacherPlayingList();
+  ggStartGameMusic();
 }
 
 function ggRenderTeacherPlayingList(){
@@ -1606,6 +1616,8 @@ function ggRenderTeacherPlayingList(){
 }
 
 function ggEnterTeacherFinished(state){
+  ggStopGameMusic();
+  ggPlayVictoryJingle();
   ggShow('gg-screen-teacher-finished');
   const rankEl = document.getElementById('ggFinishRankTeacher');
   const ranked = ggSortedPlayers(state);
@@ -1695,6 +1707,8 @@ function ggHandleStudentMessage(msg){
     return;
   }
   if(ggState.phase === 'finished' && prevPhase !== 'finished'){
+    ggStopGameMusic();
+    ggPlayVictoryJingle();
     ggEnterStudentFinished(ggState, ggState.winner === ggCurrentNick);
   }
 }
@@ -1702,6 +1716,7 @@ function ggHandleStudentMessage(msg){
 function ggEnterStudentQuiz(){
   ggShow('gg-screen-student-quiz');
   ggRenderStudentQuestion();
+  ggStartGameMusic();
 }
 
 function ggRenderStudentQuestion(){
@@ -1805,6 +1820,64 @@ function ggStartWaitMusic(){
 function ggStopWaitMusic(){
   if(ggWaitMusicTimer){ clearInterval(ggWaitMusicTimer); ggWaitMusicTimer = null; }
 }
+
+/* ---- 신나는 게임 진행 음악 ---- */
+// 도-미-솔-도(높은) 아르페지오를 빠르게 반복하는 신나는 8비트 느낌의 배경음
+const GG_GAME_MELODY = [523.25,659.25,783.99,1046.50,783.99,659.25,523.25,659.25];
+let ggGameMelodyIdx = 0;
+let ggGameMusicTimer = null;
+function ggStartGameMusic(){
+  ggEnsureAudio();
+  if(!ggAudioCtx || ggAudioMuted) return;
+  ggStopGameMusic();
+  ggGameMelodyIdx = 0;
+  ggGameMusicTimer = setInterval(() => {
+    if(ggAudioMuted || !ggAudioCtx) return;
+    const freq = GG_GAME_MELODY[ggGameMelodyIdx % GG_GAME_MELODY.length];
+    ggGameMelodyIdx++;
+    const osc = ggAudioCtx.createOscillator();
+    const gain = ggAudioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    gain.gain.value = 0.04;
+    osc.connect(gain).connect(ggAudioCtx.destination);
+    osc.start();
+    osc.stop(ggAudioCtx.currentTime + 0.13);
+  }, 150);
+}
+function ggStopGameMusic(){
+  if(ggGameMusicTimer){ clearInterval(ggGameMusicTimer); ggGameMusicTimer = null; }
+}
+
+/* ---- 승리 팡파레 (한 번만 재생) ---- */
+function ggPlayVictoryJingle(){
+  ggEnsureAudio();
+  if(!ggAudioCtx || ggAudioMuted) return;
+  const notes = [523.25,659.25,783.99,1046.50];
+  notes.forEach((freq, i) => {
+    setTimeout(() => {
+      if(ggAudioMuted || !ggAudioCtx) return;
+      const osc = ggAudioCtx.createOscillator();
+      const gain = ggAudioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.09;
+      osc.connect(gain).connect(ggAudioCtx.destination);
+      osc.start();
+      osc.stop(ggAudioCtx.currentTime + 0.35);
+    }, i * 140);
+  });
+}
+
+/* ---- 음소거 버튼 ---- */
+document.getElementById('ggMuteBtn').addEventListener('click', () => {
+  ggAudioMuted = !ggAudioMuted;
+  document.getElementById('ggMuteBtn').textContent = ggAudioMuted ? '🔇' : '🔊';
+  if(ggAudioMuted){
+    ggStopWaitMusic();
+    ggStopGameMusic();
+  }
+});
 
 /* ---- 큐알/링크로 바로 입장 ---- */
 function ggInitDeepLink(){
